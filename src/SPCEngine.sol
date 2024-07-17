@@ -26,6 +26,7 @@ pragma solidity ^0.8.19;
 import {StablePayCoin} from "./StablePayCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 /*
  * @title SPCEngine
@@ -59,22 +60,22 @@ contract SPCEngine is ReentrancyGuard {
     ////////////////////////
     //   STATE VARIABLE   //
     ///////////////////////
-    mapping(address token => address priceFeed) public s_priceFeeds;
-    mapping(address user => mapping(address token => uint256 amount))
-        public s_depositedCollaterals;
-    StablePayCoin private immutable i_spc;
+    uint256 private constant ADDITIONAL_FEED_PERCISION = 10*8;
+    uint256 private constant PERCISION = 10*18;
 
-    event CollateralDeposited(
-        address indexed user,
-        address indexed tokenAddress,
-        uint256 tokenAmount
-    );
+    mapping(address token => address priceFeed) private s_priceFeeds;
+    mapping(address user => mapping(address token => uint256 amount)) private s_depositedCollaterals;
+    mapping(address user => uint256 amountOfSPCMinted) private s_SPCMinted;
+    StablePayCoin private immutable i_spc;
+    address[] private s_collateralTokens;
+
+    event CollateralDeposited(address indexed user, address indexed tokenAddress, uint256 tokenAmount);
 
     /////////////////
     //   MODIFIER  //
     ////////////////
 
-    modifier moreThanZero(uint _amount) {
+    modifier moreThanZero(uint256 _amount) {
         if (_amount <= 0) {
             revert SPCEngine__NeedsMoreThanZero();
         }
@@ -91,17 +92,14 @@ contract SPCEngine is ReentrancyGuard {
     /////////////////
     //   FUNCTION  //
     ////////////////
-    constructor(
-        address[] memory tokenAddresses,
-        address[] memory priceFeedsAddresses,
-        address spcAddress
-    ) {
+    constructor(address[] memory tokenAddresses, address[] memory priceFeedsAddresses, address spcAddress) {
         if (tokenAddresses.length != priceFeedsAddresses.length) {
             revert SPC__tokenAddressAndPriceFeedsAddressMustHaveTheSameLength();
         }
 
-        for (uint i = 0; i < tokenAddresses.length; i++) {
+        for (uint256 i = 0; i < tokenAddresses.length; i++) {
             s_priceFeeds[tokenAddresses[i]] = priceFeedsAddresses[i];
+            s_collateralTokens.push(tokenAddresses[i]);
         }
 
         i_spc = StablePayCoin(spcAddress);
@@ -116,28 +114,15 @@ contract SPCEngine is ReentrancyGuard {
      * @param tokenCollateralAddress: The address of the token to deposit as collateral
      * @param collateralAmount: The amount of token to deposit
      */
-    function depositCollateral(
-        address _tokenCollateralAddress,
-        uint256 _amountCollateral
-    )
+    function depositCollateral(address _tokenCollateralAddress, uint256 _amountCollateral)
         external
         moreThanZero(_amountCollateral)
         isAllowedToken(_tokenCollateralAddress)
         nonReentrant
     {
-        s_depositedCollaterals[msg.sender][
-            _tokenCollateralAddress
-        ] += _amountCollateral;
-        emit CollateralDeposited(
-            msg.sender,
-            _tokenCollateralAddress,
-            _amountCollateral
-        );
-        bool success = IERC20(_tokenCollateralAddress).transferFrom(
-            msg.sender,
-            address(this),
-            _amountCollateral
-        );
+        s_depositedCollaterals[msg.sender][_tokenCollateralAddress] += _amountCollateral;
+        emit CollateralDeposited(msg.sender, _tokenCollateralAddress, _amountCollateral);
+        bool success = IERC20(_tokenCollateralAddress).transferFrom(msg.sender, address(this), _amountCollateral);
         if (!success) {
             revert SPCEngine__TransferFailed();
         }
@@ -152,8 +137,58 @@ contract SPCEngine is ReentrancyGuard {
     function burn() external {}
 
     function liquidate() external {}
+    /**
+     * @notice it Follow CEI
+     * @param _amountSPCtoMint is the amount of the token minted
+     * @notice they must have collateral value that there minimum treshold
+     *
+     */
+    function mint(uint256 _amountSPCtoMint) external moreThanZero(_amountSPCtoMint) nonReentrant {
+        s_SPCMinted[msg.sender] = _amountSPCtoMint;
 
-    function mint() external {}
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     function getHealthFactor() external {}
+
+    /////////////////////////////////////
+    //   PRIVATE & INTERNAL VIEW FUNCTION  //
+    ///////////////////////////////////
+
+    function _revertIfHealthFactorIsBroken(address user) private view {
+
+    }
+    /**
+     * 
+     * @param user the address of the user to check their collateral balance 
+     * Return how close to liquidity the user is
+     */
+
+    function _healthFactor(address user) private view returns (uint256 ) {
+        (uint256 totalSPCMinted, uint256 CollateralValueInUsd) = _getAccountInfomation(user);
+    }
+
+    function _getAccountInfomation(address user) private view returns (uint256 totalSPCMinted, uint256 totalAccountCollateralValue) {
+        totalSPCMinted = s_SPCMinted[user];
+        totalAccountCollateralValue = getAccountCollateralValue(user);
+    }
+
+    /////////////////////////////////////
+    //   PUBLIC & EXTERNAL VIEW FUNCTION  //
+    ///////////////////////////////////
+    function getAccountCollateralValue(address user) public view returns (uint totalCollateralInUsd) {
+        for(uint256 i = 0; i < s_collateralTokens.length; i++) {
+            address token = s_collateralTokens[i];
+            uint256 amount = s_depositedCollaterals[user][token];
+            totalCollateralInUsd += getUsdValue(token, amount);
+        }
+        return totalCollateralInUsd;
+    }
+
+    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
+        AggregatorV3Interface priceFeeds = AggregatorV3Interface(s_priceFeeds[token]);
+        (,int price,,,) = priceFeeds.latestRoundData();
+
+        return ((amount * uint256(price)) * ADDITIONAL_FEED_PERCISION)/ PERCISION;
+    }
 }
