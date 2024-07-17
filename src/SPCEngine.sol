@@ -56,12 +56,17 @@ contract SPCEngine is ReentrancyGuard {
     error SPC__tokenAddressAndPriceFeedsAddressMustHaveTheSameLength();
     error SPCEngine__isNotAllowedToken();
     error SPCEngine__TransferFailed();
+    error SPCEngine__BreaksHealthFactor(uint256 userHealthFactor);
+    error SPCEngine__MintFailed();
 
     ////////////////////////
     //   STATE VARIABLE   //
     ///////////////////////
-    uint256 private constant ADDITIONAL_FEED_PERCISION = 10*8;
-    uint256 private constant PERCISION = 10*18;
+    uint256 private constant ADDITIONAL_FEED_PERCISION = 10 * 8;
+    uint256 private constant PERCISION = 10 * 18;
+    uint256 private constant LIQUIDATION_THRESHOLD = 50;
+    uint256 private constant LIQUIDATION_PERCISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
 
     mapping(address token => address priceFeed) private s_priceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_depositedCollaterals;
@@ -143,10 +148,15 @@ contract SPCEngine is ReentrancyGuard {
      * @notice they must have collateral value that there minimum treshold
      *
      */
+
     function mint(uint256 _amountSPCtoMint) external moreThanZero(_amountSPCtoMint) nonReentrant {
         s_SPCMinted[msg.sender] = _amountSPCtoMint;
 
         _revertIfHealthFactorIsBroken(msg.sender);
+        bool minted = i_spc.mint(msg.sender, _amountSPCtoMint);
+        if (!minted) {
+            revert SPCEngine__MintFailed();
+        }
     }
 
     function getHealthFactor() external {}
@@ -156,19 +166,29 @@ contract SPCEngine is ReentrancyGuard {
     ///////////////////////////////////
 
     function _revertIfHealthFactorIsBroken(address user) private view {
-
+        uint256 userHealthFactor = _healthFactor(user);
+        if (userHealthFactor < MIN_HEALTH_FACTOR) {
+            revert SPCEngine__BreaksHealthFactor(userHealthFactor);
+        }
     }
     /**
-     * 
-     * @param user the address of the user to check their collateral balance 
+     *
+     * @param user the address of the user to check their collateral balance
      * Return how close to liquidity the user is
      */
 
-    function _healthFactor(address user) private view returns (uint256 ) {
-        (uint256 totalSPCMinted, uint256 CollateralValueInUsd) = _getAccountInfomation(user);
+    function _healthFactor(address user) private view returns (uint256) {
+        (uint256 totalSPCMinted, uint256 collateralValueInUsd) = _getAccountInfomation(user);
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PERCISION;
+
+        return (collateralAdjustedForThreshold * PERCISION) / totalSPCMinted;
     }
 
-    function _getAccountInfomation(address user) private view returns (uint256 totalSPCMinted, uint256 totalAccountCollateralValue) {
+    function _getAccountInfomation(address user)
+        private
+        view
+        returns (uint256 totalSPCMinted, uint256 totalAccountCollateralValue)
+    {
         totalSPCMinted = s_SPCMinted[user];
         totalAccountCollateralValue = getAccountCollateralValue(user);
     }
@@ -176,8 +196,8 @@ contract SPCEngine is ReentrancyGuard {
     /////////////////////////////////////
     //   PUBLIC & EXTERNAL VIEW FUNCTION  //
     ///////////////////////////////////
-    function getAccountCollateralValue(address user) public view returns (uint totalCollateralInUsd) {
-        for(uint256 i = 0; i < s_collateralTokens.length; i++) {
+    function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralInUsd) {
+        for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
             uint256 amount = s_depositedCollaterals[user][token];
             totalCollateralInUsd += getUsdValue(token, amount);
@@ -187,8 +207,8 @@ contract SPCEngine is ReentrancyGuard {
 
     function getUsdValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeeds = AggregatorV3Interface(s_priceFeeds[token]);
-        (,int price,,,) = priceFeeds.latestRoundData();
+        (, int256 price,,,) = priceFeeds.latestRoundData();
 
-        return ((amount * uint256(price)) * ADDITIONAL_FEED_PERCISION)/ PERCISION;
+        return ((amount * uint256(price)) * ADDITIONAL_FEED_PERCISION) / PERCISION;
     }
 }
