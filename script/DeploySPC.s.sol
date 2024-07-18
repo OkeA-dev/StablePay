@@ -25,15 +25,15 @@ pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
 import {StablePayCoin} from "../src/StablePayCoin.sol";
+import {SPCEngine} from "../src/SPCEngine.sol";
 
 contract DeploySPC is Script {
     StablePayCoin stablePayCoin;
 
-    function run() external returns (StablePayCoin) {
+    function run() external returns (StablePayCoin, SPCEngine) {
         vm.startBroadcast();
         stablePayCoin = new StablePayCoin();
         vm.stopBroadcast();
 
-        return stablePayCoin;
-    }
+           }
 }
