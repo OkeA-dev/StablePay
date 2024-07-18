@@ -35,12 +35,12 @@ contract DeploySPC is Script {
     function run() external returns (StablePayCoin, SPCEngine) {
         HelperConfig config = new HelperConfig();
 
-        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address wbtc, address weth,) =
+        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address wbtc, address weth, uint256 deployerKey) =
             config.activeNetworkConfig();
         tokenAddresses = [weth, wbtc];
         priceFeedAddresses = [wethUsdPriceFeed, wbtcUsdPriceFeed];
 
-        vm.startBroadcast();
+        vm.startBroadcast(deployerKey);
         StablePayCoin spc = new StablePayCoin();
         SPCEngine spcEngine = new SPCEngine(tokenAddresses, priceFeedAddresses, address(spc));
         spc.transferOwnership(address(spcEngine));
