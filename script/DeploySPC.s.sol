@@ -32,7 +32,7 @@ contract DeploySPC is Script {
     address[] public tokenAddresses;
     address[] public priceFeedAddresses;
 
-    function run() external returns (StablePayCoin, SPCEngine) {
+    function run() external returns (StablePayCoin, SPCEngine, HelperConfig) {
         HelperConfig config = new HelperConfig();
 
         (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address wbtc, address weth, uint256 deployerKey) =
@@ -47,6 +47,6 @@ contract DeploySPC is Script {
 
         vm.stopBroadcast();
 
-        return (spc, spcEngine);
+        return (spc, spcEngine, config);
     }
 }

@@ -74,7 +74,7 @@ contract HelperConfig is Script {
         );
 
         ERC20Mock wethMock = new ERC20Mock();
-        wethMock.mint(msg.sender, 2000e8);
+        wethMock.mint(msg.sender, 1000e8);
 
         MockV3Aggregator btcUsdPriceFeed = new MockV3Aggregator(
             DECIMALS,
@@ -82,7 +82,7 @@ contract HelperConfig is Script {
         );
 
         ERC20Mock wbtcMock = new ERC20Mock();
-        wbtcMock.mint(msg.sender, 2000e8);
+        wbtcMock.mint(msg.sender, 1000e8);
         vm.stopBroadcast();
 
         return NetworkConfig({

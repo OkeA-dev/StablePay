@@ -209,6 +209,10 @@ contract SPCEngine is ReentrancyGuard {
         AggregatorV3Interface priceFeeds = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeeds.latestRoundData();
 
-        return ((amount * uint256(price)) * ADDITIONAL_FEED_PERCISION) / PERCISION;
+        return ((amount * PERCISION)/ (uint(price) * ADDITIONAL_FEED_PERCISION));
     }
 }
+
+
+//    uint256 private constant PRECISION = 1e18;
+    //uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
