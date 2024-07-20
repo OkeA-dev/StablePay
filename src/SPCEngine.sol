@@ -62,8 +62,8 @@ contract SPCEngine is ReentrancyGuard {
     ////////////////////////
     //   STATE VARIABLE   //
     ///////////////////////
-    uint256 private constant ADDITIONAL_FEED_PERCISION = 10 * 8;
-    uint256 private constant PERCISION = 10 * 18;
+    uint256 private constant ADDITIONAL_FEED_PERCISION = 1e10;
+    uint256 private constant PERCISION = 1e18;
     uint256 private constant LIQUIDATION_THRESHOLD = 50;
     uint256 private constant LIQUIDATION_PERCISION = 100;
     uint256 private constant MIN_HEALTH_FACTOR = 1;
@@ -193,9 +193,9 @@ contract SPCEngine is ReentrancyGuard {
         totalAccountCollateralValue = getAccountCollateralValue(user);
     }
 
-    /////////////////////////////////////
+    /////////////////////////////////////////
     //   PUBLIC & EXTERNAL VIEW FUNCTION  //
-    ///////////////////////////////////
+    ///////////////////////////////////////
     function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralInUsd) {
         for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
@@ -209,7 +209,7 @@ contract SPCEngine is ReentrancyGuard {
         AggregatorV3Interface priceFeeds = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeeds.latestRoundData();
 
-        return ((amount * PERCISION)/ (uint(price) * ADDITIONAL_FEED_PERCISION));
+        return ((uint256(price) * ADDITIONAL_FEED_PERCISION) * amount) / PERCISION;
     }
 }
 

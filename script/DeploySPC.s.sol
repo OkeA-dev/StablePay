@@ -35,7 +35,7 @@ contract DeploySPC is Script {
     function run() external returns (StablePayCoin, SPCEngine, HelperConfig) {
         HelperConfig config = new HelperConfig();
 
-        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address wbtc, address weth, uint256 deployerKey) =
+        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address weth, address wbtc,  uint256 deployerKey) =
             config.activeNetworkConfig();
         tokenAddresses = [weth, wbtc];
         priceFeedAddresses = [wethUsdPriceFeed, wbtcUsdPriceFeed];

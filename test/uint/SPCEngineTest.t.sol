@@ -43,15 +43,15 @@ contract TestSPCEngine is Test {
         (wethUsdPriceFeed,, weth,,) = config.activeNetworkConfig();
     }
 
-    ////////////////////////
-    //    PRICE TEST    ///
+      //////////////////////
+     //    PRICE TEST    //
     //////////////////////
-    function testGetUsdValue() public {
-        uint256 ethAmount = 20e18;
-        //20e18 * 2000 = 40000e18
-        uint256 expectedValue = 40000e18;
+    function testGetUsdValue() public view {
+        uint256 ethAmount = 15e18;
+      
+        uint256 expectedValue = 30_000 ether;
         uint256 actualValue = spcEngine.getUsdValue(weth, ethAmount);
 
-        assertEq(expectedValue, actualValue);
+        assertEq(actualValue, expectedValue);
     }
 }
