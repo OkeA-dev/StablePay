@@ -75,6 +75,7 @@ contract SPCEngine is ReentrancyGuard {
     address[] private s_collateralTokens;
 
     event CollateralDeposited(address indexed user, address indexed tokenAddress, uint256 tokenAmount);
+    event RedeemCollateral(address indexed user, address indexed token, uint256 tokenAmount);
 
     /////////////////
     //   MODIFIER  //
@@ -134,34 +135,68 @@ contract SPCEngine is ReentrancyGuard {
     }
 
     /**
-     * 
+     *
      * @param _tokenCollateralAddress the token address of the deposited collateral
      * @param _amountCollateral the amount of collateral to deposite
      * @param _amountSPCtoMint the amount of SPC token to mint
      * @notice this function would deposit collateral and mint spc token at one transaction
      */
-
-    function depositCollateralAndMintSPC(address _tokenCollateralAddress, uint256 _amountCollateral, uint256 _amountSPCtoMint) external {
+    function depositCollateralAndMintSPC(
+        address _tokenCollateralAddress,
+        uint256 _amountCollateral,
+        uint256 _amountSPCtoMint
+    ) external {
         depositCollateral(_tokenCollateralAddress, _amountCollateral);
         mint(_amountSPCtoMint);
     }
 
-    function redeemCollateralForSPC() external {}
+    /**
+     * 
+     * @param _tokenCollateralAddress the collateral addresst to redeem
+     * @param _amountCollateral the amount of collateral to redeem
+     * @param _amountSPCtoBurn the amount of token Spc to burn
+     * @notice this function redeem collateral and burn the spc token
+     */
+    function redeemCollateralForSPC(address _tokenCollateralAddress, uint256 _amountCollateral, uint256 _amountSPCtoBurn) external {
+        redeemCollateral(_tokenCollateralAddress, _amountCollateral);
+        burn(_amountSPCtoBurn);
+    }
 
-    function redeemCollateral() external {}
+    function redeemCollateral(address _tokenCollateralAddress, uint256 _amountCollateral)
+        public
+        moreThanZero(_amountCollateral)
+        nonReentrant
+    {
+        s_depositedCollaterals[msg.sender][_tokenCollateralAddress] -= _amountCollateral;
+        emit RedeemCollateral(msg.sender, _tokenCollateralAddress, _amountCollateral);
+        bool success = IERC20(_tokenCollateralAddress).transfer(msg.sender, _amountCollateral);
+        if (!success) {
+            revert SPCEngine__TransferFailed();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
-    function burn() external {}
+    function burn(uint256 _amountSPCtoBurn) public moreThanZero(_amountSPCtoBurn) {
+        s_SPCMinted[msg.sender] -= _amountSPCtoBurn;
+        bool success = i_spc.transferFrom(msg.sender, address(this), _amountSPCtoBurn);
+
+        if (!success) {
+            revert SPCEngine__TransferFailed();
+        }
+        i_spc.burn(_amountSPCtoBurn);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     function liquidate() external {}
     /**
      * @notice it Follow CEI
      * @param _amountSPCtoMint is the amount of the token minted
-     * @notice they must have collateral value that there minimum treshold
+     * @notice they must have collateral value that there _inimum treshold
      *
      */
 
     function mint(uint256 _amountSPCtoMint) public moreThanZero(_amountSPCtoMint) nonReentrant {
-        s_SPCMinted[msg.sender] = _amountSPCtoMint;
+        s_SPCMinted[msg.sender] += _amountSPCtoMint;
 
         _revertIfHealthFactorIsBroken(msg.sender);
         bool minted = i_spc.mint(msg.sender, _amountSPCtoMint);
@@ -224,6 +259,5 @@ contract SPCEngine is ReentrancyGuard {
     }
 }
 
-
 //    uint256 private constant PRECISION = 1e18;
-    //uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+//uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
