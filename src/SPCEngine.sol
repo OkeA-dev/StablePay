@@ -96,7 +96,7 @@ contract SPCEngine is ReentrancyGuard {
 
     /////////////////
     //   FUNCTION  //
-    ////////////////
+    /////////////////
     constructor(address[] memory tokenAddresses, address[] memory priceFeedsAddresses, address spcAddress) {
         if (tokenAddresses.length != priceFeedsAddresses.length) {
             revert SPC__tokenAddressAndPriceFeedsAddressMustHaveTheSameLength();
@@ -120,7 +120,7 @@ contract SPCEngine is ReentrancyGuard {
      * @param collateralAmount: The amount of token to deposit
      */
     function depositCollateral(address _tokenCollateralAddress, uint256 _amountCollateral)
-        external
+        public
         moreThanZero(_amountCollateral)
         isAllowedToken(_tokenCollateralAddress)
         nonReentrant
@@ -133,7 +133,18 @@ contract SPCEngine is ReentrancyGuard {
         }
     }
 
-    function depositCollateralAndMintSPC() external {}
+    /**
+     * 
+     * @param _tokenCollateralAddress the token address of the deposited collateral
+     * @param _amountCollateral the amount of collateral to deposite
+     * @param _amountSPCtoMint the amount of SPC token to mint
+     * @notice this function would deposit collateral and mint spc token at one transaction
+     */
+
+    function depositCollateralAndMintSPC(address _tokenCollateralAddress, uint256 _amountCollateral, uint256 _amountSPCtoMint) external {
+        depositCollateral(_tokenCollateralAddress, _amountCollateral);
+        mint(_amountSPCtoMint);
+    }
 
     function redeemCollateralForSPC() external {}
 
@@ -149,7 +160,7 @@ contract SPCEngine is ReentrancyGuard {
      *
      */
 
-    function mint(uint256 _amountSPCtoMint) external moreThanZero(_amountSPCtoMint) nonReentrant {
+    function mint(uint256 _amountSPCtoMint) public moreThanZero(_amountSPCtoMint) nonReentrant {
         s_SPCMinted[msg.sender] = _amountSPCtoMint;
 
         _revertIfHealthFactorIsBroken(msg.sender);
