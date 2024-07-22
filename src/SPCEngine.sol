@@ -176,6 +176,12 @@ contract SPCEngine is ReentrancyGuard {
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
+    /**
+     * 
+     * @param _amountSPCtoBurn the amount of the Spc token to burn
+     * @notice this function send the specific amount of spc to the spcEngine contract to  burn.
+     */
+
     function burn(uint256 _amountSPCtoBurn) public moreThanZero(_amountSPCtoBurn) {
         s_SPCMinted[msg.sender] -= _amountSPCtoBurn;
         bool success = i_spc.transferFrom(msg.sender, address(this), _amountSPCtoBurn);
