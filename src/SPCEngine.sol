@@ -58,6 +58,7 @@ contract SPCEngine is ReentrancyGuard {
     error SPCEngine__TransferFailed();
     error SPCEngine__BreaksHealthFactor(uint256 userHealthFactor);
     error SPCEngine__MintFailed();
+    error SPCEngine__UserHealthFactorOk();
 
     ////////////////////////
     //   STATE VARIABLE   //
@@ -66,7 +67,7 @@ contract SPCEngine is ReentrancyGuard {
     uint256 private constant PERCISION = 1e18;
     uint256 private constant LIQUIDATION_THRESHOLD = 50;
     uint256 private constant LIQUIDATION_PERCISION = 100;
-    uint256 private constant MIN_HEALTH_FACTOR = 1;
+    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
     mapping(address token => address priceFeed) private s_priceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_depositedCollaterals;
@@ -151,13 +152,17 @@ contract SPCEngine is ReentrancyGuard {
     }
 
     /**
-     * 
+     *
      * @param _tokenCollateralAddress the collateral addresst to redeem
      * @param _amountCollateral the amount of collateral to redeem
      * @param _amountSPCtoBurn the amount of token Spc to burn
      * @notice this function redeem collateral and burn the spc token
      */
-    function redeemCollateralForSPC(address _tokenCollateralAddress, uint256 _amountCollateral, uint256 _amountSPCtoBurn) external {
+    function redeemCollateralForSPC(
+        address _tokenCollateralAddress,
+        uint256 _amountCollateral,
+        uint256 _amountSPCtoBurn
+    ) external {
         redeemCollateral(_tokenCollateralAddress, _amountCollateral);
         burn(_amountSPCtoBurn);
     }
@@ -177,11 +182,10 @@ contract SPCEngine is ReentrancyGuard {
     }
 
     /**
-     * 
+     *
      * @param _amountSPCtoBurn the amount of the Spc token to burn
      * @notice this function send the specific amount of spc to the spcEngine contract to  burn.
      */
-
     function burn(uint256 _amountSPCtoBurn) public moreThanZero(_amountSPCtoBurn) {
         s_SPCMinted[msg.sender] -= _amountSPCtoBurn;
         bool success = i_spc.transferFrom(msg.sender, address(this), _amountSPCtoBurn);
@@ -193,7 +197,22 @@ contract SPCEngine is ReentrancyGuard {
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
-    function liquidate() external {}
+    /**
+     *
+     * @param _collateral the token address of collateral to be liquidated
+     * @param _user the address of the user to be liquidated
+     * @param _debtToCover amount of collateral to pay the undercollateralise user
+     */
+    function liquidate(address _collateral, address _user, uint256 _debtToCover)
+        external
+        moreThanZero(_debtToCover)
+        nonReentrant
+    {
+        uint256 startingUserHealthFactor = _healthFactor(_user);
+        if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
+            revert SPCEngine__UserHealthFactorOk();
+        }
+    }
     /**
      * @notice it Follow CEI
      * @param _amountSPCtoMint is the amount of the token minted
